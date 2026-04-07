@@ -36,6 +36,13 @@ final class TasksViewModel: ObservableObject {
         }
     }
 
+    func deleteTask(_ task: TaskItem) {
+        Task {
+            await taskUseCases.deleteTask(task.id)
+            tasks = await taskUseCases.fetchTasks()
+        }
+    }
+
     func deleteTask(at offsets: IndexSet) {
         let ids = offsets.compactMap { tasks[safe: $0]?.id }
 
