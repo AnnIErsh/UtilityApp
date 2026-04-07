@@ -7,7 +7,12 @@ final class FocusTimerViewModel: ObservableObject {
     @Published var isRunning: Bool = false
     @Published var selectedMinutes: Int = 25 {
         didSet {
-            guard !isRunning else { return }
+            if isRunning {
+                if selectedMinutes != oldValue {
+                    selectedMinutes = oldValue
+                }
+                return
+            }
             remainingSeconds = selectedMinutes * 60
         }
     }
@@ -50,6 +55,8 @@ final class FocusTimerViewModel: ObservableObject {
     }
 
     private func handleTimerTick() {
+        guard isRunning else { return }
+
         if remainingSeconds > 0 {
             remainingSeconds -= 1
         } else {

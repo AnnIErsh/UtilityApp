@@ -99,6 +99,17 @@ final class CoreDataDataService: DataService {
         }
     }
 
+    func deleteHabit(id: UUID) async {
+        await performContextWork { context in
+            let request = HabitEntity.fetchRequest()
+            request.predicate = NSPredicate(format: "id == %@", id as CVarArg)
+
+            guard let entity = try? context.fetch(request).first else { return }
+            context.delete(entity)
+            self.stack.saveContext()
+        }
+    }
+
     func fetchFocusSessions() async -> [FocusSessionItem] {
         await performContextWork { context in
             let request = FocusSessionEntity.fetchRequest()

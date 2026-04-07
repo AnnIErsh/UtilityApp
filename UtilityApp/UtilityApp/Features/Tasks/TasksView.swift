@@ -13,11 +13,13 @@ struct TasksView: View {
                 HStack(spacing: 8) {
                     TextField("New task", text: $viewModel.newTaskTitle)
                         .textFieldStyle(.roundedBorder)
+                        .font(AppTypography.body())
                     Button("Add") {
                         viewModel.addTask()
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(AppTheme.primary)
+                    .font(AppTypography.body())
                 }
                 .padding(.horizontal, LayoutMetrics.contentHorizontalPadding)
 
@@ -27,6 +29,8 @@ struct TasksView: View {
                             Image(systemName: iconName(for: task))
                                 .foregroundColor(iconColor(for: task))
                             Text(task.title)
+                                .font(AppTypography.body())
+                                .foregroundColor(AppTheme.textPrimary)
                                 .strikethrough(task.isDone)
                                 .lineLimit(2)
                             Spacer()
@@ -40,7 +44,7 @@ struct TasksView: View {
                 }
                 .listStyle(.plain)
             }
-            .background(AppTheme.background)
+            .background(AppTheme.screenBackground.ignoresSafeArea())
             .navigationTitle("Tasks")
         }
         .onAppear {
@@ -59,6 +63,6 @@ struct TasksView: View {
         if task.isDone {
             return AppTheme.accent
         }
-        return .gray
+        return AppTheme.textSecondary
     }
 }

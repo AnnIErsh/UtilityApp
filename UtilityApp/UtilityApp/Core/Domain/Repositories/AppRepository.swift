@@ -9,6 +9,7 @@ protocol AppRepository {
     func fetchHabits() async -> [HabitItem]
     func addHabit(name: String, targetPerWeek: Int) async
     func incrementHabit(id: UUID) async
+    func deleteHabit(id: UUID) async
 
     func fetchFocusSessions() async -> [FocusSessionItem]
     func saveFocusSession(durationMinutes: Int) async

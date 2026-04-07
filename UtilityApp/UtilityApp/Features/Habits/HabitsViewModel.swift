@@ -35,4 +35,28 @@ final class HabitsViewModel: ObservableObject {
             habits = await habitUseCases.fetchHabits()
         }
     }
+
+    func deleteHabit(_ habit: HabitItem) {
+        Task {
+            await habitUseCases.deleteHabit(habit.id)
+            habits = await habitUseCases.fetchHabits()
+        }
+    }
+
+    func deleteHabits(at offsets: IndexSet) {
+        let items = offsets.compactMap { habits[safe: $0] }
+
+        Task {
+            for habit in items {
+                await habitUseCases.deleteHabit(habit.id)
+            }
+            habits = await habitUseCases.fetchHabits()
+        }
+    }
+}
+
+private extension Array {
+    subscript(safe index: Int) -> Element? {
+        indices.contains(index) ? self[index] : nil
+    }
 }

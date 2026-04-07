@@ -1,56 +1,37 @@
 import SwiftUI
 
-private enum AppTab: Int, CaseIterable {
-    case home
-    case tasks
-    case focus
-    case habits
-    case stats
-
-    var title: String {
-        switch self {
-        case .home: return "Home"
-        case .tasks: return "Tasks"
-        case .focus: return "Focus"
-        case .habits: return "Habits"
-        case .stats: return "Stats"
-        }
-    }
-
-    var icon: String {
-        switch self {
-        case .home: return "house.fill"
-        case .tasks: return "checklist"
-        case .focus: return "timer"
-        case .habits: return "leaf.fill"
-        case .stats: return "chart.bar.fill"
-        }
-    }
-}
-
 struct MainTabView: View {
     private let useCases: AppUseCaseFactory
-    @State private var selectedTab: AppTab = .home
+    @StateObject private var viewModel = MainTabViewModel()
 
     init(locator: ServiceLocator) {
         self.useCases = locator.resolve(AppUseCaseFactory.self)
     }
 
     var body: some View {
-        selectedContent
-            .safeAreaInset(edge: .bottom) {
-                customTabBar
+        ZStack {
+            ForEach(viewModel.tabs) { tab in
+                tabContent(tab)
+                    .opacity(viewModel.layerOpacity(for: tab))
+                    .allowsHitTesting(viewModel.isSelected(tab))
+                    .accessibilityHidden(!viewModel.isSelected(tab))
             }
+        }
+        .animation(.easeInOut(duration: 0.22), value: viewModel.selectedTab)
+        .safeAreaInset(edge: .bottom) {
+            customTabBar
+        }
     }
 
     @ViewBuilder
-    private var selectedContent: some View {
-        switch selectedTab {
+    private func tabContent(_ tab: AppTab) -> some View {
+        switch tab {
         case .home:
             DashboardView(
                 taskUseCases: useCases.taskUseCases,
                 habitUseCases: useCases.habitUseCases,
-                focusUseCases: useCases.focusUseCases
+                focusUseCases: useCases.focusUseCases,
+                isActive: viewModel.isSelected(.home)
             )
         case .tasks:
             TasksView(taskUseCases: useCases.taskUseCases)
@@ -62,7 +43,8 @@ struct MainTabView: View {
             StatsView(
                 taskUseCases: useCases.taskUseCases,
                 habitUseCases: useCases.habitUseCases,
-                focusUseCases: useCases.focusUseCases
+                focusUseCases: useCases.focusUseCases,
+                isActive: viewModel.isSelected(.stats)
             )
         }
     }
@@ -75,41 +57,65 @@ struct MainTabView: View {
                     RoundedRectangle(cornerRadius: 34, style: .continuous)
                         .strokeBorder(Color.white.opacity(0.45), lineWidth: 1)
                 }
-                .shadow(color: Color.black.opacity(0.08), radius: 12, x: 0, y: 6)
+                .shadow(color: AppTheme.cardShadow, radius: 12, x: 0, y: 6)
                 .frame(height: 68)
 
             GeometryReader { proxy in
-                let tabWidth = proxy.size.width / CGFloat(AppTab.allCases.count)
+                let metrics = viewModel.indicatorMetrics(totalWidth: proxy.size.width)
+
                 RoundedRectangle(cornerRadius: 28, style: .continuous)
-                    .fill(Color.white.opacity(0.65))
+                    .fill(
+                        LinearGradient(
+                            colors: [AppTheme.primary.opacity(0.20), AppTheme.accent.opacity(0.16), Color.white.opacity(0.75)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
                     .overlay {
                         RoundedRectangle(cornerRadius: 28, style: .continuous)
-                            .strokeBorder(Color.white.opacity(0.7), lineWidth: 0.8)
+                            .strokeBorder(Color.white.opacity(0.78), lineWidth: 0.8)
                     }
-                    .frame(width: tabWidth - 8, height: 52)
-                    .offset(x: CGFloat(selectedTab.rawValue) * tabWidth + 4, y: 8)
-                    .animation(.interactiveSpring(response: 0.30, dampingFraction: 0.92), value: selectedTab)
+                    .frame(width: metrics.width, height: 52)
+                    .offset(x: metrics.x, y: 8)
+                    .contentShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { value in
+                                viewModel.updateDrag(translation: value.translation.width)
+                            }
+                            .onEnded { value in
+                                withAnimation(.interactiveSpring(response: 0.32, dampingFraction: 0.86, blendDuration: 0.2)) {
+                                    viewModel.endDrag(
+                                        totalWidth: proxy.size.width,
+                                        predictedTranslation: value.predictedEndTranslation.width
+                                    )
+                                }
+                            }
+                    )
             }
             .frame(height: 68)
 
             HStack(spacing: 0) {
-                ForEach(AppTab.allCases, id: \.rawValue) { tab in
+                ForEach(viewModel.tabs) { tab in
                     Button {
-                        selectedTab = tab
+                        withAnimation(.interactiveSpring(response: 0.32, dampingFraction: 0.88, blendDuration: 0.2)) {
+                            viewModel.selectTab(tab)
+                        }
                     } label: {
                         VStack(spacing: 4) {
                             Image(systemName: tab.icon)
                                 .font(.system(size: 20, weight: .semibold))
                             Text(tab.title)
-                                .font(.system(size: 12, weight: .medium))
+                                .font(AppTypography.caption())
                         }
                         .frame(maxWidth: .infinity)
-                        .foregroundColor(tab == selectedTab ? AppTheme.primary : .primary.opacity(0.85))
+                        .foregroundColor(viewModel.isSelected(tab) ? AppTheme.primaryDeep : AppTheme.textPrimary.opacity(0.78))
                         .padding(.vertical, 10)
                     }
                     .buttonStyle(.plain)
                 }
             }
+            .allowsHitTesting(!viewModel.isDraggingIndicator)
             .frame(height: 68)
         }
         .padding(.horizontal, 16)

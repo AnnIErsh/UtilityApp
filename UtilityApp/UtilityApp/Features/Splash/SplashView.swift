@@ -5,12 +5,8 @@ struct SplashView: View {
 
     var body: some View {
         ZStack {
-            LinearGradient(
-                colors: [AppTheme.primary.opacity(0.95), AppTheme.accent.opacity(0.9)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
+            AppTheme.splashGradient
+                .ignoresSafeArea()
 
             VStack(spacing: 18) {
                 Image(systemName: "timer.circle.fill")
@@ -21,12 +17,12 @@ struct SplashView: View {
                     .animation(.easeInOut(duration: 1).repeatForever(autoreverses: true), value: animate)
 
                 Text("FocusFlow")
-                    .font(.system(size: titleSize, weight: .bold))
+                    .font(AppTypography.hero(titleSize))
                     .minimumScaleFactor(0.8)
                     .foregroundColor(.white)
 
                 Text("Plan • Focus • Improve")
-                    .font(.subheadline)
+                    .font(AppTypography.body(14))
                     .foregroundColor(.white.opacity(0.9))
             }
             .padding(.horizontal, LayoutMetrics.contentHorizontalPadding)
@@ -45,9 +41,9 @@ struct SplashView: View {
 
     private var titleSize: CGFloat {
         if LayoutMetrics.isSmallDevice {
-            return 28
+            return 30
         }
-        return 34
+        return 36
     }
 
     private var iconScale: CGFloat {

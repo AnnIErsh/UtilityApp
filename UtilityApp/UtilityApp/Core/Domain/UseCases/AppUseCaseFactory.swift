@@ -16,7 +16,8 @@ struct AppUseCaseFactory {
         habitUseCases = HabitUseCases(
             fetchHabits: { await repository.fetchHabits() },
             addHabit: { name, target in await repository.addHabit(name: name, targetPerWeek: target) },
-            incrementHabit: { id in await repository.incrementHabit(id: id) }
+            incrementHabit: { id in await repository.incrementHabit(id: id) },
+            deleteHabit: { id in await repository.deleteHabit(id: id) }
         )
 
         focusUseCases = FocusUseCases(

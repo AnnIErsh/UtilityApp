@@ -35,6 +35,10 @@ final class AppRepositoryImpl: AppRepository {
         await dataService.incrementHabit(id: id)
     }
 
+    func deleteHabit(id: UUID) async {
+        await dataService.deleteHabit(id: id)
+    }
+
     func fetchFocusSessions() async -> [FocusSessionItem] {
         await dataService.fetchFocusSessions()
     }

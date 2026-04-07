@@ -11,9 +11,9 @@ struct FocusTimerView: View {
         NavigationView {
             VStack(spacing: stackSpacing) {
                 Text(timeText)
-                    .font(.system(size: timerFontSize, weight: .bold, design: .rounded))
+                    .font(AppTypography.hero(timerFontSize))
                     .minimumScaleFactor(0.7)
-                    .foregroundColor(AppTheme.primary)
+                    .foregroundColor(AppTheme.primaryDeep)
 
                 ProgressView(value: viewModel.progress)
                     .progressViewStyle(.linear)
@@ -27,24 +27,28 @@ struct FocusTimerView: View {
                 }
                 .pickerStyle(.segmented)
                 .padding(.horizontal, LayoutMetrics.contentHorizontalPadding)
+                .disabled(viewModel.isRunning)
+                .opacity(viewModel.isRunning ? 0.6 : 1)
 
-                HStack(spacing: 12) {
+                VStack(spacing: 10) {
                     Button(startPauseTitle) {
                         viewModel.startPause()
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(AppTheme.primary)
+                    .frame(maxWidth: .infinity)
+                    .buttonStyle(FocusActionButtonStyle(isPrimary: true))
 
                     Button("Reset") {
                         viewModel.reset()
                     }
-                    .buttonStyle(.bordered)
+                    .frame(maxWidth: .infinity)
+                    .buttonStyle(FocusActionButtonStyle(isPrimary: false))
                 }
+                .padding(.horizontal, LayoutMetrics.contentHorizontalPadding)
 
                 Spacer()
             }
             .padding(.top, topPadding)
-            .background(AppTheme.background)
+            .background(AppTheme.screenBackground.ignoresSafeArea())
             .navigationTitle("Focus")
         }
     }
@@ -81,5 +85,61 @@ struct FocusTimerView: View {
             return 46
         }
         return 56
+    }
+}
+
+private struct FocusActionButtonStyle: ButtonStyle {
+    let isPrimary: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(AppTypography.section())
+            .foregroundColor(foregroundColor)
+            .frame(maxWidth: .infinity)
+            .frame(height: 54)
+            .background(background)
+            .overlay {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(borderColor, lineWidth: 1)
+            }
+            .cornerRadius(14)
+            .shadow(color: shadowColor, radius: 8, x: 0, y: 4)
+            .scaleEffect(configuration.isPressed ? 0.98 : 1)
+            .opacity(configuration.isPressed ? 0.9 : 1)
+            .animation(.easeOut(duration: 0.18), value: configuration.isPressed)
+    }
+
+    private var foregroundColor: Color {
+        if isPrimary {
+            return .white
+        }
+        return AppTheme.primaryDeep
+    }
+
+    private var background: some ShapeStyle {
+        if isPrimary {
+            return AnyShapeStyle(
+                LinearGradient(
+                    colors: [AppTheme.primary, AppTheme.primaryDeep],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+        }
+        return AnyShapeStyle(Color.white.opacity(0.86))
+    }
+
+    private var borderColor: Color {
+        if isPrimary {
+            return Color.white.opacity(0.22)
+        }
+        return Color.white.opacity(0.7)
+    }
+
+    private var shadowColor: Color {
+        if isPrimary {
+            return AppTheme.primaryDeep.opacity(0.22)
+        }
+        return AppTheme.cardShadow
     }
 }
