@@ -1,7 +1,9 @@
 import SwiftUI
+import UIKit
 
 struct TasksView: View {
     @StateObject private var viewModel: TasksViewModel
+    @FocusState private var isTaskInputFocused: Bool
 
     init(taskUseCases: TaskUseCases) {
         _viewModel = StateObject(wrappedValue: TasksViewModel(taskUseCases: taskUseCases))
@@ -35,6 +37,9 @@ struct TasksView: View {
             .navigationTitle("Tasks")
             .navigationBarTitleDisplayMode(.large)
         }
+        .sheet(item: $viewModel.selectedTask) { task in
+            TaskDetailsSheet(task: task)
+        }
         .onAppear {
             viewModel.reload()
         }
@@ -47,6 +52,7 @@ struct TasksView: View {
                 .autocorrectionDisabled(true)
                 .textInputAutocapitalization(.never)
                 .submitLabel(.done)
+                .focused($isTaskInputFocused)
                 .font(AppTypography.body())
                 .padding(.horizontal, 14)
                 .frame(height: 46)
@@ -115,5 +121,114 @@ struct TasksView: View {
         }
         .cornerRadius(16)
         .shadow(color: AppTheme.cardShadow, radius: 10, x: 0, y: 5)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            openTaskDetails(task)
+        }
     }
+
+    private func openTaskDetails(_ task: TaskItem) {
+        isTaskInputFocused = false
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        DispatchQueue.main.async {
+            viewModel.showTaskDetails(task)
+        }
+    }
+}
+
+private struct TaskDetailsSheet: View {
+    let task: TaskItem
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                statusBadge
+
+                titleCard
+
+                detailCard
+            }
+            .padding(LayoutMetrics.contentHorizontalPadding)
+            .padding(.top, 10)
+        }
+        .background(sheetBackground.ignoresSafeArea())
+    }
+
+    private var statusBadge: some View {
+        Text(task.isDone ? "Done" : "In progress")
+            .font(AppTypography.caption(13))
+            .foregroundColor(task.isDone ? AppTheme.accent : AppTheme.primary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background((task.isDone ? AppTheme.accent : AppTheme.primary).opacity(0.14))
+            .clipShape(Capsule())
+    }
+
+    private var detailCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            detailRow(title: "Created", value: Self.formatter.string(from: task.createdAt))
+            if let dueDate = task.dueDate {
+                detailRow(title: "Due", value: Self.formatter.string(from: dueDate))
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(AppTheme.card)
+        .overlay {
+            RoundedRectangle(cornerRadius: LayoutMetrics.cardCornerRadius)
+                .strokeBorder(AppTheme.cardStroke, lineWidth: 1)
+        }
+        .cornerRadius(LayoutMetrics.cardCornerRadius)
+    }
+
+    private var titleCard: some View {
+        Text(task.title)
+            .font(AppTypography.title(28))
+            .foregroundColor(AppTheme.textPrimary)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(14)
+            .background(AppTheme.card)
+            .overlay {
+                RoundedRectangle(cornerRadius: LayoutMetrics.cardCornerRadius)
+                    .strokeBorder(AppTheme.cardStroke, lineWidth: 1)
+            }
+            .cornerRadius(LayoutMetrics.cardCornerRadius)
+            .shadow(color: AppTheme.cardShadow, radius: colorScheme == .dark ? 14 : 8, x: 0, y: 4)
+    }
+
+    private var sheetBackground: LinearGradient {
+        if colorScheme == .dark {
+            return LinearGradient(
+                colors: [
+                    Color.black.opacity(0.30),
+                    AppTheme.background,
+                    AppTheme.primary.opacity(0.10)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
+        return AppTheme.screenBackground
+    }
+
+    private func detailRow(title: String, value: String) -> some View {
+        HStack {
+            Text(title)
+                .font(AppTypography.caption(13))
+                .foregroundColor(AppTheme.textSecondary)
+            Spacer()
+            Text(value)
+                .font(AppTypography.body(14))
+                .foregroundColor(AppTheme.textPrimary)
+        }
+    }
+
+    private static let formatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter
+    }()
 }

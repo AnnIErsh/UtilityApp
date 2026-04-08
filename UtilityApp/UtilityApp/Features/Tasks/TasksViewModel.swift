@@ -5,6 +5,7 @@ import Foundation
 final class TasksViewModel: ObservableObject {
     @Published private(set) var tasks: [TaskItem] = []
     @Published var newTaskTitle: String = ""
+    @Published var selectedTask: TaskItem?
 
     private let taskUseCases: TaskUseCases
 
@@ -52,6 +53,10 @@ final class TasksViewModel: ObservableObject {
             }
             tasks = await taskUseCases.fetchTasks()
         }
+    }
+
+    func showTaskDetails(_ task: TaskItem) {
+        selectedTask = task
     }
 }
 
