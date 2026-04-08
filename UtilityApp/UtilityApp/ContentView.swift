@@ -11,6 +11,7 @@ struct ContentView: View {
 
     var body: some View {
         rootContent
+            .dismissKeyboardOnGlobalTap()
             .task {
                 try? await Task.sleep(nanoseconds: 1_800_000_000)
                 withAnimation(.easeInOut(duration: 0.3)) {
