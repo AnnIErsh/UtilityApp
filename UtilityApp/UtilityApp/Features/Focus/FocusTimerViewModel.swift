@@ -30,15 +30,23 @@ final class FocusTimerViewModel: ObservableObject {
         static let selectedMinutes = "focus.timer.selectedMinutes"
         static let isRunning = "focus.timer.isRunning"
         static let endDate = "focus.timer.endDate"
+        static let isPaused = "focus.timer.isPaused"
+        static let pausedRemainingSeconds = "focus.timer.pausedRemainingSeconds"
+        static let pendingSessionID = "focus.timer.pendingSessionID"
+        static let pendingSessionEndDate = "focus.timer.pendingSessionEndDate"
+        static let pendingSessionDuration = "focus.timer.pendingSessionDuration"
+        static let lastSavedPendingSessionID = "focus.timer.lastSavedPendingSessionID"
     }
 
     init(focusUseCases: FocusUseCases, storage: UserDefaults = .standard) {
         self.focusUseCases = focusUseCases
         self.storage = storage
         restoreState()
+        restoreFromPendingSessionIfNeeded()
         refreshStatusText()
         Task {
             await focusUseCases.requestNotificationAccess()
+            await reconcilePendingCompletedSessionIfNeeded()
         }
     }
 
@@ -66,12 +74,18 @@ final class FocusTimerViewModel: ObservableObject {
         guard !isRunning else { return }
         guard remainingSeconds > 0 else { return }
 
+        clearPausedState()
         endDate = Date().addingTimeInterval(TimeInterval(remainingSeconds))
         isRunning = true
         startTimerIfNeeded()
         refreshFromClock()
         persistState()
         refreshStatusText()
+        storePendingSession(
+            id: UUID().uuidString,
+            endDate: endDate ?? Date(),
+            durationMinutes: selectedMinutes
+        )
         let secondsToFinish = remainingSeconds
         Task {
             await focusUseCases.scheduleCompletionNotification(secondsToFinish)
@@ -79,7 +93,15 @@ final class FocusTimerViewModel: ObservableObject {
     }
 
     func handleSceneDidBecomeActive() {
+        Task {
+            await reconcilePendingCompletedSessionIfNeeded()
+        }
+        restoreFromPendingSessionIfNeeded()
+        if handleCompletionTapIfNeeded() {
+            return
+        }
         handlePauseActionIfNeeded()
+        restoreRunningStateFromEndDateIfNeeded()
         if isRunning {
             refreshFromClock()
             startTimerIfNeeded()
@@ -122,12 +144,13 @@ final class FocusTimerViewModel: ObservableObject {
     }
 
     private func finishSession() {
-        pause(clearProgress: true)
-        let completedMinutes = selectedMinutes
+        pause(clearProgress: true, clearPendingData: false)
         Task {
-            await focusUseCases.saveFocusSession(completedMinutes)
+            await savePendingSessionIfNeeded()
             await focusUseCases.cancelFocusNotifications()
         }
+        clearPendingSession()
+        clearPausedState()
         remainingSeconds = selectedMinutes * 60
         persistState()
         refreshStatusText()
@@ -136,7 +159,7 @@ final class FocusTimerViewModel: ObservableObject {
         }
     }
 
-    private func pause(clearProgress: Bool = false) {
+    private func pause(clearProgress: Bool = false, clearPendingData: Bool = true) {
         isRunning = false
         timer?.invalidate()
         timer = nil
@@ -145,8 +168,15 @@ final class FocusTimerViewModel: ObservableObject {
         if clearProgress {
             remainingSeconds = selectedMinutes * 60
             storage.removeObject(forKey: StorageKeys.endDate)
+            clearPausedState()
         } else {
             storage.removeObject(forKey: StorageKeys.endDate)
+            storage.set(true, forKey: StorageKeys.isPaused)
+            storage.set(remainingSeconds, forKey: StorageKeys.pausedRemainingSeconds)
+        }
+
+        if clearPendingData {
+            clearPendingSession()
         }
 
         persistState()
@@ -166,10 +196,9 @@ final class FocusTimerViewModel: ObservableObject {
             remainingSeconds = selectedMinutes * 60
         }
 
-        let wasRunning = storage.bool(forKey: StorageKeys.isRunning)
         let storedEndDate = storage.object(forKey: StorageKeys.endDate) as? Date
 
-        if wasRunning, let storedEndDate {
+        if let storedEndDate, storedEndDate > Date() {
             endDate = storedEndDate
             isRunning = true
             refreshFromClock()
@@ -179,7 +208,15 @@ final class FocusTimerViewModel: ObservableObject {
         } else {
             isRunning = false
             endDate = nil
+            if storage.bool(forKey: StorageKeys.isPaused) {
+                let pausedRemaining = storage.integer(forKey: StorageKeys.pausedRemainingSeconds)
+                remainingSeconds = max(pausedRemaining, 1)
+            } else if storedRemaining <= 0 {
+                remainingSeconds = selectedMinutes * 60
+            }
         }
+
+        restorePausedStateFromPendingSessionIfNeeded()
     }
 
     private func persistState() {
@@ -208,5 +245,117 @@ final class FocusTimerViewModel: ObservableObject {
         if isRunning {
             pause()
         }
+    }
+
+    private func restoreRunningStateFromEndDateIfNeeded() {
+        guard !isRunning else { return }
+        guard let storedEndDate = storage.object(forKey: StorageKeys.endDate) as? Date else { return }
+        guard storedEndDate > Date() else { return }
+
+        endDate = storedEndDate
+        isRunning = true
+    }
+
+    private func handleCompletionTapIfNeeded() -> Bool {
+        let completionTapped = storage.bool(forKey: FocusNotificationConstants.completionTappedKey)
+        guard completionTapped else { return false }
+        storage.set(false, forKey: FocusNotificationConstants.completionTappedKey)
+
+        if isRunning {
+            finishSession()
+            return true
+        }
+
+        if let endDate, endDate <= Date() {
+            Task {
+                await savePendingSessionIfNeeded()
+                await focusUseCases.cancelFocusNotifications()
+            }
+            isRunning = false
+            self.endDate = nil
+            remainingSeconds = selectedMinutes * 60
+            persistState()
+            refreshStatusText()
+            return true
+        }
+
+        return false
+    }
+
+    private func storePendingSession(id: String, endDate: Date, durationMinutes: Int) {
+        storage.set(id, forKey: StorageKeys.pendingSessionID)
+        storage.set(endDate, forKey: StorageKeys.pendingSessionEndDate)
+        storage.set(durationMinutes, forKey: StorageKeys.pendingSessionDuration)
+    }
+
+    private func clearPendingSession() {
+        storage.removeObject(forKey: StorageKeys.pendingSessionID)
+        storage.removeObject(forKey: StorageKeys.pendingSessionEndDate)
+        storage.removeObject(forKey: StorageKeys.pendingSessionDuration)
+    }
+
+    private func savePendingSessionIfNeeded() async {
+        guard let pendingID = storage.string(forKey: StorageKeys.pendingSessionID) else { return }
+        let lastSavedID = storage.string(forKey: StorageKeys.lastSavedPendingSessionID)
+        guard pendingID != lastSavedID else {
+            clearPendingSession()
+            return
+        }
+
+        let pendingDuration = storage.integer(forKey: StorageKeys.pendingSessionDuration)
+        let durationToSave = max(pendingDuration, selectedMinutes, 1)
+        await focusUseCases.saveFocusSession(durationToSave)
+        storage.set(pendingID, forKey: StorageKeys.lastSavedPendingSessionID)
+        clearPendingSession()
+    }
+
+    private func reconcilePendingCompletedSessionIfNeeded() async {
+        guard let pendingEndDate = storage.object(forKey: StorageKeys.pendingSessionEndDate) as? Date else { return }
+        guard Date() >= pendingEndDate else { return }
+        await savePendingSessionIfNeeded()
+    }
+
+    private func restoreFromPendingSessionIfNeeded() {
+        guard !isRunning else { return }
+        guard let pendingEndDate = storage.object(forKey: StorageKeys.pendingSessionEndDate) as? Date else { return }
+        guard pendingEndDate > Date() else { return }
+
+        let pendingDuration = storage.integer(forKey: StorageKeys.pendingSessionDuration)
+        if pendingDuration > 0 {
+            selectedMinutes = pendingDuration
+        }
+
+        endDate = pendingEndDate
+        remainingSeconds = max(Int(ceil(pendingEndDate.timeIntervalSinceNow)), 1)
+        isRunning = true
+        persistState()
+        startTimerIfNeeded()
+    }
+
+    private func restorePausedStateFromPendingSessionIfNeeded() {
+        guard !isRunning else { return }
+        guard !storage.bool(forKey: StorageKeys.isPaused) else { return }
+        guard let pendingEndDate = storage.object(forKey: StorageKeys.pendingSessionEndDate) as? Date else { return }
+        guard pendingEndDate > Date() else { return }
+
+        let pendingDuration = storage.integer(forKey: StorageKeys.pendingSessionDuration)
+        if pendingDuration > 0 {
+            selectedMinutes = pendingDuration
+        }
+
+        if let storedEndDate = storage.object(forKey: StorageKeys.endDate) as? Date, storedEndDate > Date() {
+            return
+        }
+
+        let secondsLeft = max(Int(ceil(pendingEndDate.timeIntervalSinceNow)), 1)
+        remainingSeconds = secondsLeft
+        endDate = nil
+        persistState()
+        refreshStatusText()
+    }
+
+    private func clearPausedState() {
+        storage.set(false, forKey: StorageKeys.isPaused)
+        storage.removeObject(forKey: StorageKeys.pausedRemainingSeconds)
     }
 }

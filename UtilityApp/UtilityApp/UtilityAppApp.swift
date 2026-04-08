@@ -36,6 +36,9 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         if response.actionIdentifier == FocusNotificationConstants.pauseActionID {
             UserDefaults.standard.set(true, forKey: FocusNotificationConstants.pauseRequestedKey)
         }
+        if response.notification.request.identifier == FocusNotificationConstants.completionNotificationID {
+            UserDefaults.standard.set(true, forKey: FocusNotificationConstants.completionTappedKey)
+        }
         completionHandler()
     }
 }

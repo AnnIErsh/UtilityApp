@@ -14,6 +14,7 @@ enum FocusNotificationConstants {
     static let runningNotificationID = "FOCUS_RUNNING_NOTIFICATION"
     static let completionNotificationID = "FOCUS_COMPLETION_NOTIFICATION"
     static let pauseRequestedKey = "focus.timer.pauseRequested"
+    static let completionTappedKey = "focus.timer.completionTapped"
 }
 
 final class LocalFocusNotificationService: FocusNotificationService {
