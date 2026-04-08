@@ -115,16 +115,20 @@ struct OnboardingView: View {
     }
 
     private func primaryButton(isCompact: Bool) -> some View {
-        Button(page == items.count - 1 ? "Get Started" : "Next") {
+        Button {
             if page == items.count - 1 {
                 onFinish()
             } else {
                 page += 1
             }
+        } label: {
+            Text(page == items.count - 1 ? "Get Started" : "Next")
+                .font(AppTypography.section(17))
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .font(AppTypography.section(17))
-        .foregroundColor(.white)
         .frame(maxWidth: .infinity)
         .frame(height: isCompact ? 50 : 54)
         .background(
