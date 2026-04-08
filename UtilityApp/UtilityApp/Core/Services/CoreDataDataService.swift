@@ -3,9 +3,13 @@ import Foundation
 
 final class CoreDataDataService: DataService {
     private let stack: CoreDataStack
+    private let defaults: UserDefaults
+    private let initialSeedKey = "app.initialSeed.v1"
 
-    init(stack: CoreDataStack) {
+    init(stack: CoreDataStack, defaults: UserDefaults = .standard) {
         self.stack = stack
+        self.defaults = defaults
+        seedInitialContentIfNeeded()
     }
 
     func fetchTasks() async -> [TaskItem] {
@@ -142,6 +146,54 @@ final class CoreDataDataService: DataService {
                 let value = work(self.stack.context)
                 continuation.resume(returning: value)
             }
+        }
+    }
+
+    private func seedInitialContentIfNeeded() {
+        guard !defaults.bool(forKey: initialSeedKey) else { return }
+
+        stack.context.performAndWait {
+            let taskCount = (try? stack.context.count(for: TaskEntity.fetchRequest())) ?? 0
+            let habitCount = (try? stack.context.count(for: HabitEntity.fetchRequest())) ?? 0
+
+            if taskCount == 0 {
+                let now = Date()
+                let starterTasks: [(title: String, isDone: Bool)] = [
+                    ("Install Focus Flow", true),
+                    ("Start your first 25-minute focus session", false),
+                    ("Define your top 3 tasks for today", false)
+                ]
+
+                for (index, task) in starterTasks.enumerated() {
+                    let entity = TaskEntity(context: stack.context)
+                    entity.id = UUID()
+                    entity.title = task.title
+                    entity.isDone = task.isDone
+                    entity.createdAt = now.addingTimeInterval(TimeInterval(-index))
+                    entity.dueDate = nil
+                }
+            }
+
+            if habitCount == 0 {
+                let starterHabits: [(name: String, targetPerWeek: Int16)] = [
+                    ("Drink water", 7),
+                    ("Sleep 8 hours", 7),
+                    ("20-minute walk", 5)
+                ]
+
+                for habit in starterHabits {
+                    let entity = HabitEntity(context: stack.context)
+                    entity.id = UUID()
+                    entity.name = habit.name
+                    entity.targetPerWeek = max(1, habit.targetPerWeek)
+                    entity.completedCount = 0
+                }
+            }
+
+            if stack.context.hasChanges {
+                stack.saveContext()
+            }
+            defaults.set(true, forKey: initialSeedKey)
         }
     }
 }
