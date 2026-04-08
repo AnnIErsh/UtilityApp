@@ -59,6 +59,8 @@ struct FocusTimerView: View {
         .onChange(of: scenePhase) { newPhase in
             if newPhase == .active {
                 viewModel.handleSceneDidBecomeActive()
+            } else if newPhase == .background {
+                viewModel.handleSceneDidEnterBackground()
             }
         }
     }

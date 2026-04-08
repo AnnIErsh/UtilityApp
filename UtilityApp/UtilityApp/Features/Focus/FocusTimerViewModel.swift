@@ -37,6 +37,9 @@ final class FocusTimerViewModel: ObservableObject {
         self.storage = storage
         restoreState()
         refreshStatusText()
+        Task {
+            await focusUseCases.requestNotificationAccess()
+        }
     }
 
     deinit {
@@ -69,12 +72,25 @@ final class FocusTimerViewModel: ObservableObject {
         refreshFromClock()
         persistState()
         refreshStatusText()
+        let secondsToFinish = remainingSeconds
+        Task {
+            await focusUseCases.scheduleCompletionNotification(secondsToFinish)
+        }
     }
 
     func handleSceneDidBecomeActive() {
+        handlePauseActionIfNeeded()
         if isRunning {
             refreshFromClock()
             startTimerIfNeeded()
+        }
+    }
+
+    func handleSceneDidEnterBackground() {
+        guard isRunning else { return }
+        let secondsLeft = remainingSeconds
+        Task {
+            await focusUseCases.scheduleRunningNotification(secondsLeft)
         }
     }
 
@@ -110,10 +126,14 @@ final class FocusTimerViewModel: ObservableObject {
         let completedMinutes = selectedMinutes
         Task {
             await focusUseCases.saveFocusSession(completedMinutes)
+            await focusUseCases.cancelFocusNotifications()
         }
         remainingSeconds = selectedMinutes * 60
         persistState()
         refreshStatusText()
+        Task {
+            await focusUseCases.cancelFocusNotifications()
+        }
     }
 
     private func pause(clearProgress: Bool = false) {
@@ -179,5 +199,14 @@ final class FocusTimerViewModel: ObservableObject {
             return
         }
         statusText = "Ready to focus"
+    }
+
+    private func handlePauseActionIfNeeded() {
+        let pauseRequested = storage.bool(forKey: FocusNotificationConstants.pauseRequestedKey)
+        guard pauseRequested else { return }
+        storage.set(false, forKey: FocusNotificationConstants.pauseRequestedKey)
+        if isRunning {
+            pause()
+        }
     }
 }
