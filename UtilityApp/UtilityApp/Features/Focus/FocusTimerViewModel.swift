@@ -146,7 +146,6 @@ final class FocusTimerViewModel: ObservableObject {
             await savePendingSessionIfNeeded()
             await focusUseCases.cancelFocusNotifications()
         }
-        clearPendingSession()
         clearPausedState()
         remainingSeconds = selectedMinutes * 60
         persistState()
