@@ -59,10 +59,7 @@ final class FocusTimerViewModel: ObservableObject {
     }
 
     func reset() {
-        pause()
-        remainingSeconds = selectedMinutes * 60
-        persistState()
-        refreshStatusText()
+        pause(clearProgress: true, clearPendingData: true)
     }
 
     var progress: Double {
