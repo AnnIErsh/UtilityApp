@@ -53,27 +53,31 @@ struct MainTabView: View {
 
     @ViewBuilder
     private func tabContent(_ tab: AppTab) -> some View {
-        switch tab {
-        case .home:
+        ZStack {
             DashboardView(
                 taskUseCases: useCases.taskUseCases,
                 habitUseCases: useCases.habitUseCases,
                 focusUseCases: useCases.focusUseCases,
                 isActive: viewModel.isSelected(.home)
             )
-        case .tasks:
+            .tabVisibility(viewModel.isSelected(.home))
+
             TasksView(taskUseCases: useCases.taskUseCases)
-        case .focus:
+                .tabVisibility(viewModel.isSelected(.tasks))
+
             FocusTimerView(focusUseCases: useCases.focusUseCases)
-        case .habits:
+                .tabVisibility(viewModel.isSelected(.focus))
+
             HabitsView(habitUseCases: useCases.habitUseCases)
-        case .stats:
+                .tabVisibility(viewModel.isSelected(.habits))
+
             StatsView(
                 taskUseCases: useCases.taskUseCases,
                 habitUseCases: useCases.habitUseCases,
                 focusUseCases: useCases.focusUseCases,
                 isActive: viewModel.isSelected(.stats)
             )
+            .tabVisibility(viewModel.isSelected(.stats))
         }
     }
 
@@ -132,5 +136,15 @@ struct MainTabView: View {
         .padding(.top, 4)
         .padding(.bottom, 8)
         .background(Color.clear)
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func tabVisibility(_ isVisible: Bool) -> some View {
+        self
+            .opacity(isVisible ? 1 : 0)
+            .allowsHitTesting(isVisible)
+            .accessibilityHidden(!isVisible)
     }
 }

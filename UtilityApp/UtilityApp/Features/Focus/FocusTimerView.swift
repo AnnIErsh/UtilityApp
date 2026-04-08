@@ -2,6 +2,7 @@ import SwiftUI
 
 struct FocusTimerView: View {
     @StateObject private var viewModel: FocusTimerViewModel
+    @Environment(\.scenePhase) private var scenePhase
 
     init(focusUseCases: FocusUseCases) {
         _viewModel = StateObject(wrappedValue: FocusTimerViewModel(focusUseCases: focusUseCases))
@@ -14,6 +15,10 @@ struct FocusTimerView: View {
                     .font(AppTypography.hero(timerFontSize))
                     .minimumScaleFactor(0.7)
                     .foregroundColor(AppTheme.primaryDeep)
+
+                Text(viewModel.statusText)
+                    .font(AppTypography.caption(13))
+                    .foregroundColor(AppTheme.textSecondary)
 
                 ProgressView(value: viewModel.progress)
                     .progressViewStyle(.linear)
@@ -51,6 +56,11 @@ struct FocusTimerView: View {
             .background(AppTheme.screenBackground.ignoresSafeArea())
             .navigationTitle("Focus")
         }
+        .onChange(of: scenePhase) { newPhase in
+            if newPhase == .active {
+                viewModel.handleSceneDidBecomeActive()
+            }
+        }
     }
 
     private var timeText: String {
@@ -62,6 +72,9 @@ struct FocusTimerView: View {
     private var startPauseTitle: String {
         if viewModel.isRunning {
             return "Pause"
+        }
+        if viewModel.remainingSeconds < (viewModel.selectedMinutes * 60) {
+            return "Resume"
         }
         return "Start"
     }
