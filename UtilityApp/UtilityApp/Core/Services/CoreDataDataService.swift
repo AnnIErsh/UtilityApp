@@ -5,6 +5,7 @@ final class CoreDataDataService: DataService {
     private let stack: CoreDataStack
     private let defaults: UserDefaults
     private let initialSeedKey = "app.initialSeed.v1"
+    private let habitWeekKeyPrefix = "habits.week.key."
 
     init(stack: CoreDataStack, defaults: UserDefaults = .standard) {
         self.stack = stack
@@ -66,6 +67,8 @@ final class CoreDataDataService: DataService {
 
     func fetchHabits() async -> [HabitItem] {
         await performContextWork { context in
+            self.syncHabitsToCurrentWeek(in: context)
+
             let request = HabitEntity.fetchRequest()
             request.sortDescriptors = [NSSortDescriptor(key: "name", ascending: true)]
 
@@ -88,6 +91,7 @@ final class CoreDataDataService: DataService {
             entity.name = name
             entity.targetPerWeek = Int16(max(1, targetPerWeek))
             entity.completedCount = 0
+            self.setStoredWeekKey(self.currentWeekKey(), for: entity.id)
             self.stack.saveContext()
         }
     }
@@ -98,6 +102,7 @@ final class CoreDataDataService: DataService {
             request.predicate = NSPredicate(format: "id == %@", id as CVarArg)
 
             guard let entity = try? context.fetch(request).first else { return }
+            self.syncHabitToCurrentWeek(entity)
             entity.completedCount += 1
             self.stack.saveContext()
         }
@@ -110,6 +115,7 @@ final class CoreDataDataService: DataService {
 
             guard let entity = try? context.fetch(request).first else { return }
             context.delete(entity)
+            self.clearStoredWeekKey(for: id)
             self.stack.saveContext()
         }
     }
@@ -195,5 +201,60 @@ final class CoreDataDataService: DataService {
             }
             defaults.set(true, forKey: initialSeedKey)
         }
+    }
+
+    private func syncHabitsToCurrentWeek(in context: NSManagedObjectContext) {
+        let request = HabitEntity.fetchRequest()
+        guard let habits = try? context.fetch(request) else { return }
+
+        var hasChanges = false
+        for habit in habits {
+            if syncHabitToCurrentWeek(habit) {
+                hasChanges = true
+            }
+        }
+        if hasChanges {
+            stack.saveContext()
+        }
+    }
+
+    @discardableResult
+    private func syncHabitToCurrentWeek(_ habit: HabitEntity) -> Bool {
+        let currentKey = currentWeekKey()
+        let storedKey = storedWeekKey(for: habit.id)
+
+        if let storedKey {
+            guard storedKey != currentKey else { return false }
+            habit.completedCount = 0
+            setStoredWeekKey(currentKey, for: habit.id)
+            return true
+        } else {
+            setStoredWeekKey(currentKey, for: habit.id)
+            return false
+        }
+    }
+
+    private func currentWeekKey() -> String {
+        let calendar = Calendar.current
+        let components = calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: Date())
+        let year = components.yearForWeekOfYear ?? 0
+        let week = components.weekOfYear ?? 0
+        return "\(year)-\(week)"
+    }
+
+    private func weekStorageKey(for habitID: UUID) -> String {
+        "\(habitWeekKeyPrefix)\(habitID.uuidString)"
+    }
+
+    private func storedWeekKey(for habitID: UUID) -> String? {
+        defaults.string(forKey: weekStorageKey(for: habitID))
+    }
+
+    private func setStoredWeekKey(_ value: String, for habitID: UUID) {
+        defaults.set(value, forKey: weekStorageKey(for: habitID))
+    }
+
+    private func clearStoredWeekKey(for habitID: UUID) {
+        defaults.removeObject(forKey: weekStorageKey(for: habitID))
     }
 }
