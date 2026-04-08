@@ -60,9 +60,16 @@ final class MainTabViewModel: ObservableObject {
 
     func endDrag(totalWidth: CGFloat, predictedTranslation: CGFloat) {
         let tabWidth = widthPerTab(totalWidth: totalWidth)
+        guard tabWidth.isFinite, tabWidth > 0 else {
+            dragTranslation = 0
+            isDraggingIndicator = false
+            return
+        }
+
         let minX: CGFloat = 4
         let maxX = CGFloat(tabs.count - 1) * tabWidth + 4
-        let predictedX = clamp(baseX(tabWidth: tabWidth) + predictedTranslation, min: minX, max: maxX)
+        let safePredictedTranslation = predictedTranslation.isFinite ? predictedTranslation : 0
+        let predictedX = clamp(baseX(tabWidth: tabWidth) + safePredictedTranslation, min: minX, max: maxX)
 
         let index = Int(round((predictedX - 4) / tabWidth))
         let clampedIndex = max(0, min(index, tabs.count - 1))
@@ -76,12 +83,21 @@ final class MainTabViewModel: ObservableObject {
 
     func indicatorMetrics(totalWidth: CGFloat) -> TabIndicatorMetrics {
         let tabWidth = widthPerTab(totalWidth: totalWidth)
+        guard tabWidth.isFinite, tabWidth > 0 else {
+            return TabIndicatorMetrics(x: 4, width: 44)
+        }
+
         let minX: CGFloat = 4
         let maxX = CGFloat(tabs.count - 1) * tabWidth + 4
         let x = clamp(baseX(tabWidth: tabWidth) + dragTranslation, min: minX, max: maxX)
 
         let stretch = min(abs(dragTranslation) * 0.08, 12)
-        return TabIndicatorMetrics(x: x - (stretch / 2), width: tabWidth - 8 + stretch)
+        let safeWidth = max(44, tabWidth - 8 + stretch)
+        let safeX = x - (stretch / 2)
+        return TabIndicatorMetrics(
+            x: safeX.isFinite ? safeX : 4,
+            width: safeWidth.isFinite ? safeWidth : 44
+        )
     }
 
     func isSelected(_ tab: AppTab) -> Bool {
@@ -93,7 +109,8 @@ final class MainTabViewModel: ObservableObject {
     }
 
     private func widthPerTab(totalWidth: CGFloat) -> CGFloat {
-        totalWidth / CGFloat(tabs.count)
+        guard totalWidth.isFinite, totalWidth > 0, !tabs.isEmpty else { return 0 }
+        return totalWidth / CGFloat(tabs.count)
     }
 
     private func baseX(tabWidth: CGFloat) -> CGFloat {

@@ -1,25 +1,53 @@
 import SwiftUI
 
+private struct TabBarHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
 struct MainTabView: View {
     private let useCases: AppUseCaseFactory
     @StateObject private var viewModel = MainTabViewModel()
+    @State private var isKeyboardVisible = false
+    @State private var tabBarHeight: CGFloat = 0
 
     init(locator: ServiceLocator) {
         self.useCases = locator.resolve(AppUseCaseFactory.self)
     }
 
     var body: some View {
-        ZStack {
-            ForEach(viewModel.tabs) { tab in
-                tabContent(tab)
-                    .opacity(viewModel.layerOpacity(for: tab))
-                    .allowsHitTesting(viewModel.isSelected(tab))
-                    .accessibilityHidden(!viewModel.isSelected(tab))
+        ZStack(alignment: .bottom) {
+            tabContent(viewModel.selectedTab)
+                .padding(.bottom, isKeyboardVisible ? 0 : tabBarHeight)
+                .animation(.easeInOut(duration: 0.2), value: viewModel.selectedTab)
+
+            if !isKeyboardVisible {
+                customTabBar
+                    .background(
+                        GeometryReader { geo in
+                            Color.clear
+                                .preference(key: TabBarHeightKey.self, value: geo.size.height)
+                        }
+                    )
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
-        .animation(.easeInOut(duration: 0.22), value: viewModel.selectedTab)
-        .safeAreaInset(edge: .bottom) {
-            customTabBar
+        .background(AppTheme.screenBackground.ignoresSafeArea())
+        .onPreferenceChange(TabBarHeightKey.self) { value in
+            tabBarHeight = value
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+            withAnimation(.easeOut(duration: 0.18)) {
+                isKeyboardVisible = true
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+            withAnimation(.easeOut(duration: 0.18)) {
+                isKeyboardVisible = false
+            }
         }
     }
 
@@ -50,7 +78,7 @@ struct MainTabView: View {
     }
 
     private var customTabBar: some View {
-        ZStack(alignment: .leading) {
+        ZStack {
             RoundedRectangle(cornerRadius: 34, style: .continuous)
                 .fill(.ultraThinMaterial)
                 .overlay {
@@ -60,45 +88,10 @@ struct MainTabView: View {
                 .shadow(color: AppTheme.cardShadow, radius: 12, x: 0, y: 6)
                 .frame(height: 68)
 
-            GeometryReader { proxy in
-                let metrics = viewModel.indicatorMetrics(totalWidth: proxy.size.width)
-
-                RoundedRectangle(cornerRadius: 28, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [AppTheme.primary.opacity(0.20), AppTheme.accent.opacity(0.16), Color.white.opacity(0.75)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 28, style: .continuous)
-                            .strokeBorder(Color.white.opacity(0.78), lineWidth: 0.8)
-                    }
-                    .frame(width: metrics.width, height: 52)
-                    .offset(x: metrics.x, y: 8)
-                    .contentShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-                    .gesture(
-                        DragGesture(minimumDistance: 0)
-                            .onChanged { value in
-                                viewModel.updateDrag(translation: value.translation.width)
-                            }
-                            .onEnded { value in
-                                withAnimation(.interactiveSpring(response: 0.32, dampingFraction: 0.86, blendDuration: 0.2)) {
-                                    viewModel.endDrag(
-                                        totalWidth: proxy.size.width,
-                                        predictedTranslation: value.predictedEndTranslation.width
-                                    )
-                                }
-                            }
-                    )
-            }
-            .frame(height: 68)
-
             HStack(spacing: 0) {
                 ForEach(viewModel.tabs) { tab in
                     Button {
-                        withAnimation(.interactiveSpring(response: 0.32, dampingFraction: 0.88, blendDuration: 0.2)) {
+                        withAnimation(.interactiveSpring(response: 0.30, dampingFraction: 0.90)) {
                             viewModel.selectTab(tab)
                         }
                     } label: {
@@ -109,13 +102,30 @@ struct MainTabView: View {
                                 .font(AppTypography.caption())
                         }
                         .frame(maxWidth: .infinity)
-                        .foregroundColor(viewModel.isSelected(tab) ? AppTheme.primaryDeep : AppTheme.textPrimary.opacity(0.78))
                         .padding(.vertical, 10)
+                        .background {
+                            if viewModel.isSelected(tab) {
+                                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [AppTheme.primary.opacity(0.20), AppTheme.accent.opacity(0.14), Color.white.opacity(0.75)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .overlay {
+                                        RoundedRectangle(cornerRadius: 24, style: .continuous)
+                                            .strokeBorder(Color.white.opacity(0.78), lineWidth: 0.8)
+                                    }
+                                    .padding(.horizontal, 4)
+                                    .padding(.vertical, 4)
+                            }
+                        }
+                        .foregroundColor(viewModel.isSelected(tab) ? AppTheme.primaryDeep : AppTheme.textPrimary.opacity(0.78))
                     }
                     .buttonStyle(.plain)
                 }
             }
-            .allowsHitTesting(!viewModel.isDraggingIndicator)
             .frame(height: 68)
         }
         .padding(.horizontal, 16)

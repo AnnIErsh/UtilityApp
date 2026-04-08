@@ -44,10 +44,13 @@ struct HabitsView: View {
         HStack(spacing: 10) {
             TextField("New habit", text: $viewModel.newHabitName)
                 .textFieldStyle(.plain)
+                .autocorrectionDisabled(true)
+                .textInputAutocapitalization(.never)
+                .submitLabel(.done)
                 .font(AppTypography.body())
                 .padding(.horizontal, 14)
                 .frame(height: 46)
-                .background(Color.white.opacity(0.9))
+                .background(AppTheme.card)
                 .overlay {
                     RoundedRectangle(cornerRadius: 14)
                         .strokeBorder(AppTheme.cardStroke, lineWidth: 1)
@@ -120,7 +123,7 @@ struct HabitsView: View {
         return GeometryReader { geo in
             ZStack(alignment: .leading) {
                 Capsule()
-                    .fill(Color.white.opacity(0.8))
+                    .fill(AppTheme.cardStroke.opacity(0.45))
 
                 Capsule()
                     .fill(

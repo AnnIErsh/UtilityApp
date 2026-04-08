@@ -8,7 +8,7 @@ struct SplashView: View {
             AppTheme.splashGradient
                 .ignoresSafeArea()
 
-            VStack(spacing: 18) {
+            VStack(spacing: 14) {
                 Image(systemName: "timer.circle.fill")
                     .font(.system(size: iconSize))
                     .foregroundColor(.white)
@@ -16,14 +16,15 @@ struct SplashView: View {
                     .opacity(iconOpacity)
                     .animation(.easeInOut(duration: 1).repeatForever(autoreverses: true), value: animate)
 
-                Text("FocusFlow")
+                Text("Focus Flow")
                     .font(AppTypography.hero(titleSize))
                     .minimumScaleFactor(0.8)
                     .foregroundColor(.white)
 
                 Text("Plan • Focus • Improve")
-                    .font(AppTypography.body(14))
-                    .foregroundColor(.white.opacity(0.9))
+                    .font(.system(size: subtitleSize, weight: .semibold, design: .rounded))
+                    .tracking(0.4)
+                    .foregroundColor(.white.opacity(0.86))
             }
             .padding(.horizontal, LayoutMetrics.contentHorizontalPadding)
         }
@@ -44,6 +45,13 @@ struct SplashView: View {
             return 30
         }
         return 36
+    }
+
+    private var subtitleSize: CGFloat {
+        if LayoutMetrics.isSmallDevice {
+            return 12
+        }
+        return 13
     }
 
     private var iconScale: CGFloat {

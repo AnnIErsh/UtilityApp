@@ -44,10 +44,13 @@ struct TasksView: View {
         HStack(spacing: 10) {
             TextField("New task", text: $viewModel.newTaskTitle)
                 .textFieldStyle(.plain)
+                .autocorrectionDisabled(true)
+                .textInputAutocapitalization(.never)
+                .submitLabel(.done)
                 .font(AppTypography.body())
                 .padding(.horizontal, 14)
                 .frame(height: 46)
-                .background(Color.white.opacity(0.9))
+                .background(AppTheme.card)
                 .overlay {
                     RoundedRectangle(cornerRadius: 14)
                         .strokeBorder(AppTheme.cardStroke, lineWidth: 1)
